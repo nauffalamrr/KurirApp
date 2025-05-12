@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".ui.login.LoginActivity">
+
+    <TextView
+        android:id="@+id/app_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="130dp"
+        android:text="@string/app_name"
+        android:textSize="40sp"
+        android:textStyle="bold"
+        android:textColor="@color/green"
+        app:layout_constraintBottom_toTopOf="@+id/username_layout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <LinearLayout
+        android:id="@+id/username_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@+id/app_name"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="100dp"
+        android:layout_marginLeft="20dp"
+        android:layout_marginRight="20dp">
+
+        <EditText
+            android:id="@+id/username"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/gray_login_text"
+            android:hint="@string/hint_name"
+            android:inputType="textEmailAddress"
+            android:padding="16dp"
+            android:background="@color/gray_login"
+            android:textColorHint="@color/gray_login_text" />
+
+        <EditText
+            android:id="@+id/password"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/gray_login_text"
+            android:hint="@string/hint_password"
+            android:inputType="textPassword"
+            android:layout_marginTop="20dp"
+            android:padding="16dp"
+            android:background="@color/gray_login"
+            android:textColorHint="@color/gray_login_text" />
+
+    </LinearLayout>
+
+    <Button
+    android:id="@+id/login_button"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_margin="20dp"
+    android:layout_marginTop="40dp"
+    android:text="@string/button_in"
+    android:textColor="@color/white"
+    android:backgroundTint="@color/green"
+    app:layout_constraintBottom_toBottomOf="parent"
+    app:layout_constraintEnd_toEndOf="parent"
+    app:layout_constraintStart_toStartOf="parent"
+    android:padding="10dp"
+    app:layout_constraintTop_toBottomOf="@+id/username_layout" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

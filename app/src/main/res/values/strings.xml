@@ -1,5 +1,9 @@
 <resources>
-    <string name="app_name">KurirApp</string>
+    //Login Page
+    <string name="app_name">Kurir App</string>
+    <string name="button_in">Log In</string>
+    <string name="hint_name">Username or email</string>
+    <string name="hint_password">Password</string>
 
     //Home Page
     <string name="title_home">Home</string>
