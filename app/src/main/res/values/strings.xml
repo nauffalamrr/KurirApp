@@ -1,3 +1,33 @@
 <resources>
     <string name="app_name">KurirApp</string>
+
+    //Home Page
+    <string name="title_home">Home</string>
+    <string name="welcome">Welcome to</string>
+    <string name="kurir_app">Kurir App</string>
+    <string name="top_app">#1 Route Optimization App</string>
+    <string name="select_vehicle">Select Vehicle</string>
+    <string name="vehicle_motorcycle">Motorcycle</string>
+    <string name="vehicle_car">Car</string>
+    <string name="recent_history">Recent History</string>
+    <string name="arrow">Forward Arrow</string>
+
+    //Task Page
+    <string name="title_task">Task</string>
+    <string name="title_page_task">Task List</string>
+    <string name="task_name">Task</string>
+
+    //History Page
+    <string name="title_history">History</string>
+    <string name="title_page_history">Trip History</string>
+    <string name="history_date">11 Feb, 2025</string>
+    <string name="status_trip">Completed</string>
+    <string name="from">Jl. sumbersari III</string>
+    <string name="to">Brawijaya University</string>
+
+    //Profile Page
+    <string name="title_profile">Profile</string>
+    <string name="profile_name">Name</string>
+    <string name="button_out">Log Out</string>
+
 </resources>
