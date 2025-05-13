@@ -51,9 +51,19 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    implementation (libs.kotlinx.coroutines.android)
+
+    //Live Data
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.lifecycle.livedata.ktx)
 
     //retrofit
     implementation(libs.retrofit)
     implementation(libs.retrofit2.converter.gson)
     implementation(libs.logging.interceptor)
+
+    //OSM
+    implementation (libs.osmdroid.android)
+    implementation (libs.osmbonuspack)
+    implementation (libs.play.services.location)
 }

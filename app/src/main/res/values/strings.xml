@@ -29,6 +29,15 @@
     <string name="map_location">Map Location</string>
     <string name="select_location">Select Location</string>
 
+    //Result Page
+    <string name="close_popup_button">Close Button</string>
+    <string name="begin_trip">Finish</string>
+    <string name="error_loading_route">Failed to load route: %1$s</string>
+    <string name="route_number">Route %1$d</string>
+    <string name="show_pop_up">Show Routes</string>
+    <string name="error">Error</string>
+    <string name="center_on_user">My Location</string>
+
     //Task Page
     <string name="title_task">Task</string>
     <string name="title_page_task">Task List</string>
