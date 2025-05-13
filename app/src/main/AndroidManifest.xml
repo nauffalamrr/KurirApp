@@ -17,6 +17,9 @@
         android:theme="@style/Theme.KurirApp"
         tools:targetApi="31">
         <activity
+            android:name=".ui.detailtask.DetailTaskActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.selectlocation.SelectLocationActivity"
             android:exported="false" />
         <activity
