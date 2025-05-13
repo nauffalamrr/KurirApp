@@ -46,8 +46,6 @@
     //History Page
     <string name="title_history">History</string>
     <string name="title_page_history">Trip History</string>
-    <string name="history_date">11 Feb, 2025</string>
-    <string name="status_trip">Completed</string>
 
     //Profile Page
     <string name="title_profile">Profile</string>
