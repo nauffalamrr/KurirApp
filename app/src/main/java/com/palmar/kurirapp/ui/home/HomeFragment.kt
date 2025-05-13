@@ -1,20 +1,40 @@
 package com.palmar.kurirapp.ui.home
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import com.palmar.kurirapp.R
+import com.palmar.kurirapp.databinding.FragmentHomeBinding
+import com.palmar.kurirapp.ui.destination.DestinationActivity
 
 class HomeFragment : Fragment() {
+    private var _binding: FragmentHomeBinding? = null
+    private val binding get() = _binding!!
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_home, container, false)
+        _binding = FragmentHomeBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        binding.optionMotorcycle.setOnClickListener{
+            navigateToDestinationActivity("motorcycle")
+        }
+        binding.optionCar.setOnClickListener{
+            navigateToDestinationActivity("car")
+        }
+    }
+
+    private fun navigateToDestinationActivity(vehicleType: String) {
+        val intent = Intent(requireContext(), DestinationActivity::class.java)
+        intent.putExtra("vehicleType", vehicleType)
+        startActivity(intent)
+    }
 }

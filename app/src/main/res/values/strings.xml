@@ -16,6 +16,19 @@
     <string name="recent_history">Recent History</string>
     <string name="arrow">Forward Arrow</string>
 
+    //Destination Page
+    <string name="back">Back</string>
+    <string name="vehicle_image">Vehicle Image</string>
+    <string name="vehicle_option">Vehicle Option</string>
+    <string name="your_location">Your Location</string>
+    <string name="your_destination">Your Destination</string>
+    <string name="switch_location">Switch Location</string>
+    <string name="add_destination">Add Destination</string>
+    <string name="remove_destination">Remove Destination</string>
+    <string name="optimize">Optimize</string>
+    <string name="map_location">Map Location</string>
+    <string name="select_location">Select Location</string>
+
     //Task Page
     <string name="title_task">Task</string>
     <string name="title_page_task">Task List</string>
@@ -26,12 +39,17 @@
     <string name="title_page_history">Trip History</string>
     <string name="history_date">11 Feb, 2025</string>
     <string name="status_trip">Completed</string>
-    <string name="from">Jl. sumbersari III</string>
-    <string name="to">Brawijaya University</string>
 
     //Profile Page
     <string name="title_profile">Profile</string>
     <string name="profile_name">Name</string>
     <string name="button_out">Log Out</string>
+
+    //Content Description
+    <string name="delete">Delete</string>
+    <string name="vehicle">Vehicle</string>
+    <string name="from">from</string>
+    <string name="to">to</string>
+    <string name="profile">Profile</string>
 
 </resources>
