@@ -43,6 +43,7 @@
     <string name="title_page_task">Task List</string>
     <string name="task_name">Task</string>
     <string name="do_task">Do Task</string>
+    <string name="end_task">End Task</string>
 
     //History Page
     <string name="title_history">History</string>

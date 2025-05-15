@@ -1,0 +1,39 @@
+package com.palmar.kurirapp.data.retrofit
+
+import com.palmar.kurirapp.data.LoginRequest
+import com.palmar.kurirapp.data.LoginResponse
+import com.palmar.kurirapp.data.OptimizeRouteRequest
+import com.palmar.kurirapp.data.OptimizeRouteResponse
+import com.palmar.kurirapp.data.Task
+import com.palmar.kurirapp.data.TripHistory
+import retrofit2.Call
+import retrofit2.http.Body
+import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.Path
+
+interface ApiService {
+    @POST("api/login")
+    fun login(@Body request: LoginRequest): Call<LoginResponse>
+
+    @POST("api/route")
+    fun optimizeRoute(@Body request: OptimizeRouteRequest): Call<OptimizeRouteResponse>
+
+    @GET("api/task")
+    fun getTasks(): Call<List<Task>>
+
+    @GET("api/task/{id}")
+    fun getTaskDetail(@Path("id") taskId: Int): Call<Task>
+
+    @POST("api/task/{id}/accept")
+    fun acceptTask(@Path("id") taskId: Int): Call<Void>
+
+    @POST("api/task/{id}/complete")
+    fun completeTask(@Path("id") taskId: Int): Call<Void>
+
+    @GET("api/history")
+    fun getHistory(): Call<List<TripHistory>>
+
+    @POST("api/logout")
+    fun logout(): Call<Void>
+}
