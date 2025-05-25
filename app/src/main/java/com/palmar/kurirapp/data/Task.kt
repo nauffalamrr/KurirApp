@@ -7,7 +7,9 @@ import kotlinx.parcelize.Parcelize
 data class Destination(
     val id: Int,
     val location: Location,
-    val sequence_order: Int
+    val sequence_order: Int,
+    val latitude: Double,
+    val longitude: Double
 ) : Parcelable
 
 @Parcelize

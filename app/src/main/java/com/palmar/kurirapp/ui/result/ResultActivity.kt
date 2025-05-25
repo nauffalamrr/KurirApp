@@ -1,146 +1,164 @@
 package com.palmar.kurirapp.ui.result
 
-import android.Manifest
+import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.palmar.kurirapp.MainActivity
 import com.palmar.kurirapp.R
 import com.palmar.kurirapp.adapter.ResultAdapter
-import com.palmar.kurirapp.data.Result
-import com.palmar.kurirapp.data.RoutePoint
+import com.palmar.kurirapp.data.SimpleLocation
 import com.palmar.kurirapp.databinding.ActivityResultBinding
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.osmdroid.bonuspack.routing.OSRMRoadManager
 import org.osmdroid.bonuspack.routing.Road
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
-import java.lang.Exception
 
 class ResultActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityResultBinding
     private lateinit var adapter: ResultAdapter
-    private val geoPoints = mutableListOf<GeoPoint>()
-    private val markers = mutableListOf<Marker>()
-
-    private val LOCATION_PERMISSION = Manifest.permission.ACCESS_FINE_LOCATION
-    private val LOCATION_PERMISSION_REQUEST_CODE = 123
-
-    private lateinit var mapView: MapView
+    private var startMarker: Marker? = null
+    private var roadPolyline: Polyline? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityResultBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        mapView = binding.mapView
-
         supportActionBar?.hide()
 
-        val routeDataList = intent.getParcelableArrayListExtra<RoutePoint>("routeDataList") ?: arrayListOf()
+        val startLocation = intent.getParcelableExtra<SimpleLocation>("startLocation")
+        val orderedDestinations = intent.getParcelableArrayListExtra<SimpleLocation>("orderedDestinations") ?: arrayListOf()
         val vehicleType = intent.getStringExtra("vehicleType")?.lowercase() ?: "car"
 
-        setupRecyclerView(routeDataList)
-        displayMarkersAndRoute(routeDataList, vehicleType)
-    }
-
-    private fun convertRoutePointsToResults(routePoints: List<RoutePoint>): List<Result> {
-        return routePoints.mapIndexed { index, routePoint ->
-            Result(number = index + 1, destination = routePoint.name.ifBlank { "Location ${index + 1}" })
+        val allLocations = if (startLocation != null) {
+            arrayListOf(startLocation).apply { addAll(orderedDestinations) }
+        } else {
+            orderedDestinations
         }
+
+        setupRecyclerView(orderedDestinations)
+        displayMarkersAndRoute(allLocations, vehicleType)
+
+        binding.btnClose.setOnClickListener {
+            binding.popupCard.visibility = View.GONE
+            binding.btnShowPopup.visibility = View.VISIBLE
+        }
+
+        binding.btnShowPopup.setOnClickListener {
+            binding.popupCard.visibility = View.VISIBLE
+            binding.btnShowPopup.visibility = View.GONE
+        }
+
+        binding.btnCenterOnUser.setOnClickListener {
+            startMarker?.let {
+                binding.mapView.controller.animateTo(it.position)
+            }
+        }
+
+        binding.btnGo.setOnClickListener {
+            val intent = Intent(this, MainActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            finishAffinity()
+        }
+
+        binding.mapView.setMultiTouchControls(true)
+        binding.mapView.zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.ALWAYS)
     }
 
-    private fun setupRecyclerView(routeDataList: List<RoutePoint>) {
-        val results = convertRoutePointsToResults(routeDataList)
-        adapter = ResultAdapter(results)
+    private fun setupRecyclerView(destinations: List<SimpleLocation>) {
+        adapter = ResultAdapter(destinations)
         binding.rvResult.layoutManager = LinearLayoutManager(this)
         binding.rvResult.adapter = adapter
     }
 
-    private fun displayMarkersAndRoute(routeDataList: List<RoutePoint>, vehicleType: String) {
-        geoPoints.clear()
-        mapView.overlays.clear()
-        markers.clear()
+    private fun displayMarkersAndRoute(destinations: List<SimpleLocation>, vehicleType: String) {
+        binding.mapView.overlays.clear()
 
-        val icons = listOf(
-            getDrawable(R.drawable.ic_from),
-            getDrawable(R.drawable.ic_des1),
-            getDrawable(R.drawable.ic_des2),
-            getDrawable(R.drawable.ic_des3)
+        val desIcons = listOf(
+            ContextCompat.getDrawable(this, R.drawable.ic_des1),
+            ContextCompat.getDrawable(this, R.drawable.ic_des2),
+            ContextCompat.getDrawable(this, R.drawable.ic_des3)
         )
+        val startIcon = ContextCompat.getDrawable(this, R.drawable.ic_from)
 
-        routeDataList.forEachIndexed { index, routePoint ->
-            val geoPoint = GeoPoint(routePoint.latitude, routePoint.longitude)
-            geoPoints.add(geoPoint)
-
-            val icon = icons[index % icons.size]
-
+        destinations.forEachIndexed { index, destination ->
+            val geoPoint = GeoPoint(destination.latitude, destination.longitude)
             val marker = Marker(binding.mapView).apply {
                 position = geoPoint
-                title = routePoint.name.ifBlank { if (index == 0) "Start Position" else "Destination ${index}" }
-                this.icon = icon
-                }
-            markers.add(marker)
+                title = if (index == 0) "Start Position" else "Destination $index"
+                icon = if (index == 0) startIcon else desIcons[(index -1) % desIcons.size]
+            }
             binding.mapView.overlays.add(marker)
+            if (index == 0) startMarker = marker
         }
-        mapView.invalidate()
 
-        if (geoPoints.isNotEmpty()) {
-            drawRoute(geoPoints, vehicleType)
+        if (destinations.size > 1) {
+            drawRoute(destinations, vehicleType)
+        } else {
+            binding.mapView.invalidate()
         }
     }
 
-    private fun drawRoute(geoPoints: List<GeoPoint>, vehicleType: String) {
+    private fun drawRoute(destinations: List<SimpleLocation>, vehicleType: String) {
         val roadManager = OSRMRoadManager(this, "KurirAppUserAgent")
 
         roadManager.setMean(
-            when (vehicleType.lowercase()) {
+            when(vehicleType) {
                 "motorcycle" -> OSRMRoadManager.MEAN_BY_BIKE
                 else -> OSRMRoadManager.MEAN_BY_CAR
             }
         )
 
         val colors = listOf(
-            resources.getColor(android.R.color.holo_blue_bright),
-            resources.getColor(android.R.color.holo_blue_dark),
-            resources.getColor(android.R.color.holo_purple)
+            ContextCompat.getColor(this, android.R.color.holo_blue_bright),
+            ContextCompat.getColor(this, android.R.color.holo_blue_dark),
+            ContextCompat.getColor(this, android.R.color.holo_purple)
         )
 
-        CoroutineScope(Dispatchers.IO).launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val overlayByPriority = mutableListOf<Polyline?>()
+                val overlays = mutableListOf<Polyline>()
                 val routeGeoPoints = mutableListOf<GeoPoint>()
 
-                for (i in 0 until geoPoints.size - 1) {
-                    val segmentPoints = listOf(geoPoints[i], geoPoints[i + 1])
+                for (i in 0 until destinations.size - 1) {
+                    val segmentPoints = listOf(
+                        GeoPoint(destinations[i].latitude, destinations[i].longitude),
+                        GeoPoint(destinations[i+1].latitude, destinations[i+1].longitude)
+                    )
+
                     val road: Road = roadManager.getRoad(ArrayList(segmentPoints))
+                    val segmentColor = colors[i % colors.size]
 
-                    val segmentColor = colors[i % colors.size] // Mengulang warna
-
-                    val segmentOverlay = Polyline().apply {
+                    val polyline = Polyline().apply {
                         setPoints(road.mRouteHigh)
                         color = segmentColor
                         width = 10f
                     }
-                    overlayByPriority.add(segmentOverlay)
+                    overlays.add(polyline)
                     routeGeoPoints.addAll(segmentPoints)
                 }
 
                 withContext(Dispatchers.Main) {
-                    overlayByPriority.reversed().forEach { overlay ->
-                        if (overlay != null) binding.mapView.overlays.add(overlay)
-                    }
+                    roadPolyline?.let { binding.mapView.overlays.remove(it) }
+                    overlays.forEach { binding.mapView.overlays.add(it) }
 
                     val bounds = BoundingBox.fromGeoPoints(routeGeoPoints)
                     binding.mapView.zoomToBoundingBox(bounds, true)
+                    binding.mapView.invalidate()
                 }
-
             } catch (e: Exception) {
-                e.printStackTrace()
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@ResultActivity, "Error loading route: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
                 }

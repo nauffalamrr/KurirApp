@@ -17,15 +17,14 @@ import retrofit2.Response
 
 class HistoryFragment : Fragment() {
 
-    private lateinit var binding: FragmentHistoryBinding
+    private var _binding: FragmentHistoryBinding? = null
+    private val binding get() = _binding!!
+
     private lateinit var adapter: TripHistoryAdapter
     private val tripHistoryList = mutableListOf<TripHistory>()
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
-        binding = FragmentHistoryBinding.inflate(inflater, container, false)
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
+        _binding = FragmentHistoryBinding.inflate(inflater, container, false)
         return binding.root
     }
 
@@ -45,14 +44,23 @@ class HistoryFragment : Fragment() {
     }
 
     private fun loadHistory() {
-        ApiConfig.getApiService().getHistory().enqueue(object : Callback<List<TripHistory>> {
+        val sharedPref = requireContext().getSharedPreferences("userPrefs", android.content.Context.MODE_PRIVATE)
+        val token = sharedPref.getString("access_token", null)
+
+        if (token.isNullOrEmpty()) {
+            Toast.makeText(requireContext(), "Token tidak ditemukan, silakan login ulang", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        ApiConfig.getApiService(requireContext()).getTripHistory().enqueue(object : Callback<List<TripHistory>> {
             override fun onResponse(call: Call<List<TripHistory>>, response: Response<List<TripHistory>>) {
                 if (response.isSuccessful) {
+                    val data = response.body() ?: emptyList()
                     tripHistoryList.clear()
-                    response.body()?.let { tripHistoryList.addAll(it) }
+                    tripHistoryList.addAll(data)
                     adapter.notifyDataSetChanged()
                 } else {
-                    Toast.makeText(requireContext(), "Failed to load history", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "Gagal memuat riwayat", Toast.LENGTH_SHORT).show()
                 }
             }
 
@@ -60,5 +68,10 @@ class HistoryFragment : Fragment() {
                 Toast.makeText(requireContext(), "Error: ${t.message}", Toast.LENGTH_SHORT).show()
             }
         })
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }

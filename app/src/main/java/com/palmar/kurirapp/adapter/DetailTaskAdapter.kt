@@ -3,8 +3,8 @@ package com.palmar.kurirapp.adapter
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import com.palmar.kurirapp.databinding.ItemDetailTaskBinding
 import com.palmar.kurirapp.data.Destination
+import com.palmar.kurirapp.databinding.ItemDetailTaskBinding
 
 class DetailTaskAdapter(
     private var destinations: List<Destination>
@@ -12,10 +12,7 @@ class DetailTaskAdapter(
 
     inner class DestinationViewHolder(private val binding: ItemDetailTaskBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(destination: Destination) {
-            // Use the Location properties to display the name
             binding.taskName.text = destination.location.name
-            // Optionally, show more information about the location such as coordinates
-            // binding.taskLocation.text = "Lat: ${destination.location.latitude}, Lon: ${destination.location.longitude}"
         }
     }
 
@@ -28,10 +25,11 @@ class DetailTaskAdapter(
         holder.bind(destinations[position])
     }
 
-    override fun getItemCount() = destinations.size
+    override fun getItemCount(): Int = destinations.size
 
     fun updateData(newDestinations: List<Destination>) {
         destinations = newDestinations
         notifyDataSetChanged()
     }
 }
+

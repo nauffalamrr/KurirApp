@@ -11,9 +11,9 @@ class TaskAdapter(
     private val onClick: (Task) -> Unit
 ) : RecyclerView.Adapter<TaskAdapter.TaskViewHolder>() {
 
-    inner class TaskViewHolder(val binding: ItemTaskListBinding) : RecyclerView.ViewHolder(binding.root) {
+    inner class TaskViewHolder(private val binding: ItemTaskListBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(task: Task) {
-            binding.taskName.text = "Task #${task.id}"
+            binding.taskName.text = "Task #${task.id} - Status: ${task.status.capitalize()}"
             binding.root.setOnClickListener { onClick(task) }
         }
     }

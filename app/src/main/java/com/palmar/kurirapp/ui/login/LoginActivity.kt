@@ -33,7 +33,7 @@ class LoginActivity : AppCompatActivity() {
             }
 
             val loginRequest = LoginRequest(username, password)
-            val client = ApiConfig.getApiService().login(loginRequest)
+            val client = ApiConfig.getApiService(this).login(loginRequest)
 
             client.enqueue(object : Callback<LoginResponse> {
                 override fun onResponse(call: Call<LoginResponse>, response: Response<LoginResponse>) {

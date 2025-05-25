@@ -2,26 +2,34 @@ package com.palmar.kurirapp.ui.task
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.palmar.kurirapp.adapter.TaskAdapter
 import com.palmar.kurirapp.data.Task
 import com.palmar.kurirapp.data.retrofit.ApiConfig
 import com.palmar.kurirapp.databinding.FragmentTaskBinding
 import com.palmar.kurirapp.ui.detailtask.DetailTaskActivity
-import retrofit2.*
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
 class TaskFragment : Fragment() {
-    private lateinit var binding: FragmentTaskBinding
+
+    private var _binding: FragmentTaskBinding? = null
+    private val binding get() = _binding!!
+
     private lateinit var adapter: TaskAdapter
     private val tasks = mutableListOf<Task>()
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-        binding = FragmentTaskBinding.inflate(inflater, container, false)
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        _binding = FragmentTaskBinding.inflate(inflater, container, false)
         return binding.root
     }
 
@@ -30,9 +38,10 @@ class TaskFragment : Fragment() {
 
         adapter = TaskAdapter(tasks) { task ->
             val intent = Intent(requireContext(), DetailTaskActivity::class.java)
-            intent.putExtra("task", task)
+            intent.putExtra("taskId", task.id)
             startActivity(intent)
         }
+
         binding.rvTaskList.layoutManager = LinearLayoutManager(requireContext())
         binding.rvTaskList.adapter = adapter
 
@@ -40,14 +49,22 @@ class TaskFragment : Fragment() {
     }
 
     private fun loadTasks() {
-        ApiConfig.getApiService().getTasks().enqueue(object : Callback<List<Task>> {
+        val sharedPref = requireContext().getSharedPreferences("userPrefs", android.content.Context.MODE_PRIVATE)
+        val token = sharedPref.getString("access_token", null)
+
+        if (token.isNullOrEmpty()) {
+            Toast.makeText(requireContext(), "Token tidak ditemukan, silakan login ulang", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        ApiConfig.getApiService(requireContext()).getAllTasks().enqueue(object : Callback<List<Task>> {
             override fun onResponse(call: Call<List<Task>>, response: Response<List<Task>>) {
                 if (response.isSuccessful) {
                     tasks.clear()
                     response.body()?.let { tasks.addAll(it) }
                     adapter.notifyDataSetChanged()
                 } else {
-                    Toast.makeText(requireContext(), "Failed to load tasks", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "Gagal memuat task", Toast.LENGTH_SHORT).show()
                 }
             }
 
@@ -55,5 +72,10 @@ class TaskFragment : Fragment() {
                 Toast.makeText(requireContext(), "Error: ${t.message}", Toast.LENGTH_SHORT).show()
             }
         })
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }

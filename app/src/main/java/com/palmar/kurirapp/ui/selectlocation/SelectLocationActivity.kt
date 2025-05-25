@@ -2,13 +2,13 @@ package com.palmar.kurirapp.ui.selectlocation
 
 import android.Manifest
 import android.app.Activity
-import android.app.ProgressDialog.show
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.LocationManager
 import android.os.Bundle
+import android.os.Looper
 import android.view.View
 import android.widget.Button
 import android.widget.SearchView
@@ -17,16 +17,17 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
 import androidx.core.app.ActivityCompat
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.*
 import com.palmar.kurirapp.R
 import com.palmar.kurirapp.adapter.LocationSuggestionAdapter
 import com.palmar.kurirapp.data.Location
 import com.palmar.kurirapp.data.LocationSuggestion
+import com.palmar.kurirapp.data.SimpleLocation
 import com.palmar.kurirapp.data.retrofit.NominatimApiConfig
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
 import org.osmdroid.util.GeoPoint
@@ -46,7 +47,7 @@ class SelectLocationActivity : AppCompatActivity() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var recyclerView: RecyclerView
     private lateinit var locationSuggestionsAdapter: LocationSuggestionAdapter
-    private val locationCache = mutableMapOf<String, List<LocationSuggestion>>()
+    private val locationCache = mutableMapOf<String, List<SimpleLocation>>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,72 +59,57 @@ class SelectLocationActivity : AppCompatActivity() {
 
         mapView = findViewById(R.id.map_view)
         searchView = findViewById(R.id.search_view)
-
         selectLocationButton = findViewById(R.id.select_location_button)
-
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-
         geocoder = Geocoder(this, Locale.getDefault())
+        locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
         mapView.setMultiTouchControls(true)
         mapView.zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
 
-        locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-
         recyclerView = findViewById(R.id.rv_suggestion)
         recyclerView.layoutManager = LinearLayoutManager(this)
-        locationSuggestionsAdapter = LocationSuggestionAdapter { selectedSuggestion ->
-            val geoPoint = GeoPoint(selectedSuggestion.latitude, selectedSuggestion.longitude)
-            updateLocationOnMap(geoPoint, selectedSuggestion.displayName)
+        locationSuggestionsAdapter = LocationSuggestionAdapter { selectedLocation ->
+            val geoPoint = GeoPoint(selectedLocation.latitude, selectedLocation.longitude)
+            updateLocationOnMap(geoPoint, selectedLocation.name)
             recyclerView.visibility = View.GONE
         }
         recyclerView.adapter = locationSuggestionsAdapter
 
-        val lastKnownLocation = try {
-            locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-        } catch (e: SecurityException) {
-            e.printStackTrace()
-            null
-        }
-
-        val initialPoint = if (lastKnownLocation != null) {
-            GeoPoint(lastKnownLocation.latitude, lastKnownLocation.longitude)
-        } else {
-            GeoPoint(-8.109125, -247.077650)
-        }
-
+        val initialPoint = GeoPoint(-7.9546714, 112.6100617)
         mapView.controller.setZoom(15.0)
         mapView.controller.setCenter(initialPoint)
 
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String?): Boolean {
-                return true
-            }
+            override fun onQueryTextSubmit(query: String?): Boolean = true
 
             override fun onQueryTextChange(newText: String?): Boolean {
                 val markerPresent = mapView.overlays.any { it is Marker }
                 selectLocationButton.isEnabled = markerPresent || !newText.isNullOrEmpty()
                 if (!newText.isNullOrEmpty()) {
-                    lifecycleScope.launch {
+                    CoroutineScope(Dispatchers.Main).launch {
                         val cachedSuggestions = locationCache[newText]
                         if (cachedSuggestions != null) {
                             locationSuggestionsAdapter.updateSuggestions(cachedSuggestions)
                             recyclerView.visibility = View.VISIBLE
                         } else {
                             try {
-                                val nominatimApi = NominatimApiConfig.getNominatimApiService()
-                                val suggestions = nominatimApi.searchLocations(newText)
-
-                                locationCache[newText] = suggestions
-
-                                locationSuggestionsAdapter.updateSuggestions(suggestions)
+                                val api = NominatimApiConfig.getNominatimApiService()
+                                val result = api.searchLocations(newText)
+                                val simplified = result.map {
+                                    SimpleLocation(
+                                        latitude = it.latitude,
+                                        longitude = it.longitude,
+                                        name = it.displayName
+                                    )
+                                }
+                                locationCache[newText] = simplified
+                                locationSuggestionsAdapter.updateSuggestions(simplified)
                                 recyclerView.visibility = View.VISIBLE
                             } catch (e: HttpException) {
                                 if (e.code() == 429) {
                                     Toast.makeText(this@SelectLocationActivity, "Too many requests, please wait", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    e.printStackTrace()
-                                }
+                                } else e.printStackTrace()
                             } catch (e: Exception) {
                                 e.printStackTrace()
                             }
@@ -139,15 +125,19 @@ class SelectLocationActivity : AppCompatActivity() {
         selectLocationButton.setOnClickListener {
             val marker = mapView.overlays.find { it is Marker } as? Marker
             if (marker != null) {
-                val locationName = marker.title
                 val geoPoint = marker.position
-                val location = Location(locationName, geoPoint.latitude, geoPoint.longitude)
+                val name = marker.title ?: "Selected Location"
+                val selected = Location(
+                    latitude = geoPoint.latitude,
+                    longitude = geoPoint.longitude,
+                    name = name
+                )
 
                 val requestCode = intent.getIntExtra("requestCode", 0)
                 val position = intent.getIntExtra("position", -1)
 
                 val resultIntent = Intent().apply {
-                    putExtra("location", location)
+                    putExtra("location", selected)
                     putExtra("requestCode", requestCode)
                     putExtra("position", position)
                 }
@@ -162,47 +152,6 @@ class SelectLocationActivity : AppCompatActivity() {
             getCurrentLocation()
         }
 
-        mapView.overlays.add(object : Overlay() {
-            override fun onSingleTapConfirmed(e: android.view.MotionEvent?, mapView: MapView?): Boolean {
-                e?.let {
-                    val projection = mapView?.projection
-                    val geoPoint = projection?.fromPixels(it.x.toInt(), it.y.toInt()) as? GeoPoint
-                    geoPoint?.let { point ->
-                        val locationName = getLocationName(point) ?: "Unknown Location"
-                        updateLocationOnMap(point, locationName)
-                    }
-                }
-                return true
-            }
-        })
-    }
-
-    private fun updateLocationOnMap(geoPoint: GeoPoint, locationName: String) {
-        mapView.overlays.clear()
-        addMapClickListener()
-
-        val marker = Marker(mapView).apply {
-            position = geoPoint
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            title = locationName
-        }
-        mapView.overlays.add(marker)
-        mapView.controller.animateTo(geoPoint)
-    }
-
-    private fun getLocationName(geoPoint: GeoPoint): String? {
-        return try {
-            val addresses = geocoder.getFromLocation(geoPoint.latitude, geoPoint.longitude, 1)
-            if (!addresses.isNullOrEmpty()) {
-                addresses[0].getAddressLine(0)
-            } else null
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
-    }
-
-    private fun addMapClickListener() {
         mapView.overlays.add(object : Overlay() {
             override fun onSingleTapConfirmed(e: android.view.MotionEvent?, mapView: MapView?): Boolean {
                 e?.let {
@@ -237,29 +186,78 @@ class SelectLocationActivity : AppCompatActivity() {
         if (ActivityCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED &&
-            ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
         ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                1001
+            )
             return
         }
 
-        fusedLocationClient.lastLocation
-            .addOnSuccessListener { location ->
-                if (location != null) {
-                    val geoPoint = GeoPoint(location.latitude, location.longitude)
-                    val locationName = getLocationName(geoPoint) ?: "Unknown Location"
-                    updateLocationOnMap(geoPoint, locationName)
-                    mapView.controller.animateTo(geoPoint)
-                } else {
-                    Toast.makeText(this, "Unable to get current location", Toast.LENGTH_SHORT).show()
+        val locationRequest = LocationRequest.create().apply {
+            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+            interval = 0
+            fastestInterval = 0
+            numUpdates = 1
+        }
+
+        fusedLocationClient.requestLocationUpdates(
+            locationRequest,
+            object : LocationCallback() {
+                override fun onLocationResult(locationResult: LocationResult) {
+                    val location = locationResult.lastLocation
+                    if (location != null) {
+                        val geoPoint = GeoPoint(location.latitude, location.longitude)
+                        val locationName = getLocationName(geoPoint) ?: "Unknown Location"
+                        updateLocationOnMap(geoPoint, locationName)
+                        mapView.controller.animateTo(geoPoint)
+                    } else {
+                        Toast.makeText(this@SelectLocationActivity, "Unable to get current location", Toast.LENGTH_SHORT).show()
+                    }
                 }
-            }
-            .addOnFailureListener { exception ->
-                Toast.makeText(this, "Error getting current location: ${exception.message}", Toast.LENGTH_SHORT).show()
-            }
+            },
+            Looper.getMainLooper()
+        )
     }
 
+    private fun updateLocationOnMap(geoPoint: GeoPoint, locationName: String) {
+        mapView.overlays.clear()
+        addMapClickListener()
+
+        val marker = Marker(mapView).apply {
+            position = geoPoint
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            title = locationName
+        }
+        mapView.overlays.add(marker)
+        mapView.controller.animateTo(geoPoint)
+    }
+
+    private fun getLocationName(geoPoint: GeoPoint): String? {
+        return try {
+            val addresses = geocoder.getFromLocation(geoPoint.latitude, geoPoint.longitude, 1)
+            if (!addresses.isNullOrEmpty()) addresses[0].getAddressLine(0) else null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    private fun addMapClickListener() {
+        mapView.overlays.add(object : Overlay() {
+            override fun onSingleTapConfirmed(e: android.view.MotionEvent?, mapView: MapView?): Boolean {
+                e?.let {
+                    val projection = mapView?.projection
+                    val geoPoint = projection?.fromPixels(it.x.toInt(), it.y.toInt()) as? GeoPoint
+                    geoPoint?.let { point ->
+                        val locationName = getLocationName(point) ?: "Unknown Location"
+                        updateLocationOnMap(point, locationName)
+                    }
+                }
+                return true
+            }
+        })
+    }
 }

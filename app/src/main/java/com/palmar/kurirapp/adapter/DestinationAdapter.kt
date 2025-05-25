@@ -1,36 +1,32 @@
 package com.palmar.kurirapp.adapter
 
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import com.palmar.kurirapp.R
-import com.palmar.kurirapp.data.Location
+import com.palmar.kurirapp.data.Destination
 import com.palmar.kurirapp.databinding.ItemAddDestinationBinding
 
-data class Destination(val title: String, var detail: Location?)
-
 class DestinationAdapter(
-    private val destinations: MutableList<Destination>,
+    private var destinations: MutableList<Destination>,
     private val onItemClick: (Int) -> Unit
 ) : RecyclerView.Adapter<DestinationAdapter.DestinationViewHolder>() {
 
-    inner class DestinationViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        private val binding = ItemAddDestinationBinding.bind(view)
+    inner class DestinationViewHolder(private val binding: ItemAddDestinationBinding) :
+        RecyclerView.ViewHolder(binding.root) {
 
         fun bind(destination: Destination) {
-            binding.tvDestination.text = destination.title
-            binding.tvDestinationDetail.text = destination.detail?.name ?: "Your Destination"
+            binding.tvDestination.text = "Your Destination"
+            binding.tvDestinationDetail.text = destination.location.name.ifEmpty { "Pilih lokasi" }
 
-            itemView.setOnClickListener {
+            binding.root.setOnClickListener {
                 onItemClick(adapterPosition)
             }
         }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DestinationViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_add_destination, parent, false)
-        return DestinationViewHolder(view)
+        val binding = ItemAddDestinationBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        return DestinationViewHolder(binding)
     }
 
     override fun onBindViewHolder(holder: DestinationViewHolder, position: Int) {
@@ -39,8 +35,8 @@ class DestinationAdapter(
 
     override fun getItemCount(): Int = destinations.size
 
-    fun addDestination(destination: Destination) {
-        destinations.add(destination)
-        notifyItemInserted(destinations.size - 1)
+    fun updateData(newDestinations: MutableList<Destination>) {
+        destinations = newDestinations
+        notifyDataSetChanged()
     }
 }

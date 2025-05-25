@@ -1,257 +1,257 @@
 package com.palmar.kurirapp.ui.destination
 
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
-import android.location.LocationManager
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.palmar.kurirapp.R
-import com.palmar.kurirapp.adapter.Destination
 import com.palmar.kurirapp.adapter.DestinationAdapter
+import com.palmar.kurirapp.data.Destination
 import com.palmar.kurirapp.data.Location
 import com.palmar.kurirapp.data.OptimizeRouteRequest
 import com.palmar.kurirapp.data.OptimizeRouteResponse
+import com.palmar.kurirapp.data.SimpleLocation
 import com.palmar.kurirapp.data.retrofit.ApiConfig
 import com.palmar.kurirapp.databinding.ActivityDestinationBinding
+import com.palmar.kurirapp.ui.result.ResultActivity
+import com.palmar.kurirapp.ui.selectlocation.SelectLocationActivity
 import retrofit2.Call
+import retrofit2.Callback
 import retrofit2.Response
 
 class DestinationActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityDestinationBinding
+    private val destinations = mutableListOf<Destination>()
     private lateinit var adapter: DestinationAdapter
-    private val destinationList = mutableListOf<Destination>()
+    private lateinit var vehicleTypeFromHome: String
 
-    private val _isLoading = MutableLiveData<Boolean>()
-    val isLoading: LiveData<Boolean> = _isLoading
+    private val REQUEST_SELECT_LOCATION = 100
 
-    companion object {
-        const val REQUEST_CODE_FIRST_LOCATION = 100
-        const val REQUEST_CODE_FIRST_DESTINATION = 101
-        const val REQUEST_CODE_NEXT_DESTINATION = 102
-        const val SELECT_LOCATION_REQUEST_CODE = 200
-    }
+    private val accessToken: String
+        get() {
+            val sharedPref = getSharedPreferences("userPrefs", MODE_PRIVATE)
+            return sharedPref.getString("access_token", "") ?: ""
+        }
 
+    @RequiresApi(35)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityDestinationBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        vehicleTypeFromHome = intent.getStringExtra("vehicleType") ?: "motorcycle"
+
         supportActionBar?.hide()
 
-        setupRecyclerView()
+        when (vehicleTypeFromHome.lowercase()) {
+            "motorcycle" -> {
+                binding.optionVehicle.setImageResource(R.drawable.ic_motor)
+                binding.textVehicleOption.text = getString(R.string.vehicle_motorcycle)
+            }
 
-        binding.cardRemoveDestination.visibility = View.GONE
-        binding.textRemoveDestination.visibility = View.GONE
+            "car" -> {
+                binding.optionVehicle.setImageResource(R.drawable.ic_car)
+                binding.textVehicleOption.text = getString(R.string.vehicle_car)
+            }
+
+            else -> {
+                binding.optionVehicle.setImageResource(R.drawable.ic_motor)
+                binding.textVehicleOption.text = vehicleTypeFromHome
+            }
+        }
+
+        binding.backButton.setOnClickListener { finish() }
+
+        if (destinations.size < 2) {
+            destinations.clear()
+            destinations.add(
+                Destination(
+                    id = -1,
+                    location = Location(0.0, 0.0, "Your Location"),
+                    sequence_order = 1,
+                    latitude = 0.0,
+                    longitude = 0.0
+                )
+            )
+            destinations.add(
+                Destination(
+                    id = -1,
+                    location = Location(0.0, 0.0, "Your Destination"),
+                    sequence_order = 2,
+                    latitude = 0.0,
+                    longitude = 0.0
+                )
+            )
+        }
+
+        adapter = DestinationAdapter(destinations.drop(2).toMutableList()) { position ->
+            openSelectLocation(position + 2)
+        }
+
+        binding.rvAddDestination.layoutManager = LinearLayoutManager(this)
+        binding.rvAddDestination.adapter = adapter
+
+        binding.firstLocation.setOnClickListener {
+            openSelectLocation(0)
+        }
+        binding.firstDestination.setOnClickListener {
+            openSelectLocation(1)
+        }
 
         binding.buttonAddDestination.setOnClickListener {
-            addNewDestination()
+            val newDestination = Destination(
+                id = -1,
+                location = Location(0.0, 0.0, "Your Destination"),
+                sequence_order = destinations.size + 1,
+                latitude = 0.0,
+                longitude = 0.0
+            )
+            destinations.add(newDestination)
+            adapter.updateData(destinations.drop(2).toMutableList())
+            adapter.notifyDataSetChanged()
+            updateRemoveButtonVisibility()
         }
 
         binding.buttonRemoveDestination.setOnClickListener {
-            removeLastDestination()
-        }
-
-        binding.firstLocation.setOnClickListener {
-            openSelectLocationActivity(REQUEST_CODE_FIRST_LOCATION)
-        }
-
-        binding.firstDestination.setOnClickListener {
-            openSelectLocationActivity(REQUEST_CODE_FIRST_DESTINATION)
-        }
-
-        val vehicleType = intent.getStringExtra("vehicleType") ?: "car"
-        if (vehicleType == "motorcycle") {
-            binding.optionVehicle.setImageResource(R.drawable.ic_motor)
-            binding.textVehicleOption.text = getString(R.string.vehicle_motorcycle)
-        } else {
-            binding.optionVehicle.setImageResource(R.drawable.ic_car)
-            binding.textVehicleOption.text = getString(R.string.vehicle_car)
-        }
-
-        binding.backButton.setOnClickListener {
-            onBackPressed()
+            if (destinations.size > 2) {
+                destinations.removeLast()
+                adapter.updateData(destinations.drop(2).toMutableList())
+                adapter.notifyDataSetChanged()
+                updateRemoveButtonVisibility()
+            }
         }
 
         binding.buttonOptimize.setOnClickListener {
-            if (!isGpsEnabled()) {
-                promptEnableGps()
-            } else {
-                val startLoc = binding.tvLocationDetail.tag as? Location
-                if (startLoc == null) {
-                    Toast.makeText(this, "Please select start location", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                val dests = destinationList.mapNotNull { it.detail }.filter { it != startLoc }
-                if (dests.isEmpty()) {
-                    Toast.makeText(this, "Please add at least one destination", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-
-                callOptimizeRouteApi(vehicleType, startLoc, dests)
+            if (!isAllLocationsValid()) {
+                Toast.makeText(this, "Harap masukkan semua lokasi terlebih dahulu", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
+            callOptimizeRouteApi()
         }
 
-        isLoading.observe(this) { loading ->
-            showLoading(loading)
-        }
+        binding.progressBar.visibility = android.view.View.GONE
+
+        updateFirstLocationsUI()
+        updateRemoveButtonVisibility()
     }
 
-    private fun setupRecyclerView() {
-        adapter = DestinationAdapter(destinationList) { position ->
-            openSelectLocationActivity(REQUEST_CODE_NEXT_DESTINATION, position)
+    private fun openSelectLocation(position: Int) {
+        val intent = Intent(this, SelectLocationActivity::class.java).apply {
+            putExtra("requestCode", REQUEST_SELECT_LOCATION)
+            putExtra("position", position)
         }
-        binding.rvAddDestination.layoutManager = LinearLayoutManager(this)
-        binding.rvAddDestination.adapter = adapter
+        startActivityForResult(intent, REQUEST_SELECT_LOCATION)
     }
 
-    private fun addNewDestination() {
-        val maxDestinations = 9
-        if (destinationList.size < maxDestinations) {
-            val newDestination = Destination(
-                title = "Your Destination",
-                detail = null
-            )
-            destinationList.add(newDestination)
-            adapter.notifyItemInserted(destinationList.size - 1)
-
-            if (destinationList.size == maxDestinations) {
-                binding.cardAddDestination.visibility = View.GONE
-                binding.textAddDestination.visibility = View.GONE
-            }
-
-            if (destinationList.size == 1) {
-                binding.cardRemoveDestination.visibility = View.VISIBLE
-                binding.textRemoveDestination.visibility = View.VISIBLE
-            }
-        }
+    private fun updateRemoveButtonVisibility() {
+        val visible = destinations.size > 2
+        binding.cardRemoveDestination.visibility = if (visible) View.VISIBLE else View.GONE
+        binding.textRemoveDestination.visibility = if (visible) View.VISIBLE else View.GONE
     }
 
-    private fun removeLastDestination() {
-        if (destinationList.isNotEmpty()) {
-            destinationList.removeAt(destinationList.size - 1)
-            adapter.notifyItemRemoved(destinationList.size)
+    private fun updateFirstLocationsUI() {
+        binding.tvLocation.text = "Your Location"
+        binding.tvDestination.text = "Your Destination"
 
-            if (destinationList.size < 9) {
-                binding.cardAddDestination.visibility = View.VISIBLE
-                binding.textAddDestination.visibility = View.VISIBLE
-            }
-
-            if (destinationList.isEmpty()) {
-                binding.cardRemoveDestination.visibility = View.GONE
-                binding.textRemoveDestination.visibility = View.GONE
-            }
-        }
-    }
-
-    private fun openSelectLocationActivity(requestCode: Int, position: Int? = null) {
-        val intent = Intent(this, com.palmar.kurirapp.ui.selectlocation.SelectLocationActivity::class.java)
-        intent.putExtra("requestCode", requestCode)
-        position?.let { intent.putExtra("position", it) }
-        startActivityForResult(intent, SELECT_LOCATION_REQUEST_CODE)
+        binding.tvLocationDetail.text = destinations[0].location.name.ifEmpty { "Pilih lokasi" }
+        binding.tvDestinationDetail.text = destinations[1].location.name.ifEmpty { "Pilih lokasi" }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == SELECT_LOCATION_REQUEST_CODE && resultCode == Activity.RESULT_OK) {
+        if (requestCode == REQUEST_SELECT_LOCATION && resultCode == Activity.RESULT_OK) {
             val location = data?.getParcelableExtra<Location>("location")
-            val reqCode = data?.getIntExtra("requestCode", 0) ?: 0
-
-            location?.let {
-                when (reqCode) {
-                    REQUEST_CODE_FIRST_LOCATION -> {
-                        binding.tvLocationDetail.text = it.name
-                        binding.tvLocationDetail.tag = it
-                    }
-                    REQUEST_CODE_FIRST_DESTINATION -> {
-                        binding.tvDestinationDetail.text = it.name
-                        binding.tvDestinationDetail.tag = it
-                    }
-                    REQUEST_CODE_NEXT_DESTINATION -> {
-                        val position = data?.getIntExtra("position", -1) ?: -1
-                        if (position != -1) {
-                            destinationList[position].detail = it
-                            adapter.notifyItemChanged(position)
-                        }
-                    }
+            val position = data?.getIntExtra("position", -1) ?: -1
+            if (location != null && position in destinations.indices) {
+                destinations[position] = destinations[position].copy(
+                    location = location,
+                    latitude = location.latitude,
+                    longitude = location.longitude
+                )
+                if (position == 0 || position == 1) {
+                    updateFirstLocationsUI()
+                } else {
+                    adapter.updateData(destinations.drop(2).toMutableList())
+                    adapter.notifyDataSetChanged()
                 }
             }
         }
+        super.onActivityResult(requestCode, resultCode, data)
     }
 
-    private fun isGpsEnabled(): Boolean {
-        val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        return locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+    private fun isAllLocationsValid(): Boolean {
+        return destinations.all { dest ->
+            val name = dest.location.name.lowercase()
+            dest.latitude != 0.0 && dest.longitude != 0.0 &&
+                    name.isNotEmpty() &&
+                    name != "your location" && name != "your destination" && name != "pilih lokasi"
+        }
     }
 
-    private fun promptEnableGps() {
-        AlertDialog.Builder(this)
-            .setTitle("Enable GPS")
-            .setMessage("GPS is required to optimize the route. Please enable GPS and try again.")
-            .setPositiveButton("OK") { _, _ ->
-                val intent = Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS)
-                startActivity(intent)
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
+    private fun callOptimizeRouteApi() {
+        if (accessToken.isBlank()) {
+            Toast.makeText(this, "Token tidak ditemukan. Silakan login ulang.", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-    private fun callOptimizeRouteApi(vehicleType: String, startLocation: Location, destinations: List<Location>) {
-        val apiService = ApiConfig.getApiService()
+        val start = SimpleLocation(
+            latitude = destinations[0].latitude,
+            longitude = destinations[0].longitude,
+            name = destinations[0].location.name
+        )
 
-        val allDestinations = mutableListOf(startLocation)
-        if (destinations.isNotEmpty()) {
-            allDestinations.addAll(destinations)
+        val destinationLocations = destinations.drop(1).map {
+            SimpleLocation(it.latitude, it.longitude, it.location.name)
         }
 
         val request = OptimizeRouteRequest(
-            vehicleType = vehicleType,
-            startLocation = startLocation,
-            destinations = allDestinations
+            start = start,
+            vehicle_type = vehicleTypeFromHome,
+            destinations = destinationLocations
         )
 
-        _isLoading.value = true
+        binding.buttonOptimize.isEnabled = false
+        binding.progressBar.visibility = View.VISIBLE
 
-        apiService.optimizeRoute(request).enqueue(object : retrofit2.Callback<OptimizeRouteResponse> {
-            override fun onResponse(call: Call<OptimizeRouteResponse>, response: Response<OptimizeRouteResponse>) {
-                _isLoading.value = false
+        val apiService = ApiConfig.getApiService(this)
+        val call = apiService.optimizeRoute(request)
+
+        call.enqueue(object : Callback<OptimizeRouteResponse> {
+            override fun onResponse(
+                call: Call<OptimizeRouteResponse>,
+                response: Response<OptimizeRouteResponse>
+            ) {
+                binding.buttonOptimize.isEnabled = true
+                binding.progressBar.visibility = android.view.View.GONE
                 if (response.isSuccessful) {
-                    val optimizedList = response.body()?.orderedDestinations ?: emptyList()
-                    updateDestinations(optimizedList)
+                    val orderedDestinations = ArrayList(response.body()?.ordered_destinations?.map {
+                        SimpleLocation(it.latitude, it.longitude, it.name ?: "")
+                    } ?: emptyList())
+
+                    if (orderedDestinations.isNotEmpty()) {
+                        val intent = Intent(this@DestinationActivity, ResultActivity::class.java).apply {
+                            putParcelableArrayListExtra("orderedDestinations", orderedDestinations)
+                            putExtra("startLocation", start)
+                            putExtra("vehicleType", vehicleTypeFromHome)
+                        }
+                        startActivity(intent)
+                    } else {
+                        Toast.makeText(this@DestinationActivity, "Rute tidak ditemukan", Toast.LENGTH_SHORT).show()
+                    }
                 } else {
-                    Toast.makeText(this@DestinationActivity, "Failed to optimize route", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@DestinationActivity, "Error: ${response.message()}", Toast.LENGTH_SHORT).show()
                 }
             }
 
             override fun onFailure(call: Call<OptimizeRouteResponse>, t: Throwable) {
-                _isLoading.value = false
-                Toast.makeText(this@DestinationActivity, "Error: ${t.message}", Toast.LENGTH_SHORT).show()
+                binding.buttonOptimize.isEnabled = true
+                binding.progressBar.visibility = android.view.View.GONE
+                Toast.makeText(this@DestinationActivity, "Gagal: ${t.message}", Toast.LENGTH_SHORT).show()
             }
         })
-    }
-
-    private fun updateDestinations(optimizedList: List<Location>) {
-        destinationList.clear()
-        optimizedList.forEach { loc ->
-            destinationList.add(Destination(title = loc.name, detail = loc))
-        }
-        adapter.notifyDataSetChanged()
-    }
-
-    private fun showLoading(isLoading: Boolean) {
-        if (isLoading) {
-            binding.progressBar.visibility = View.VISIBLE
-            binding.buttonOptimize.isEnabled = false
-        } else {
-            binding.progressBar.visibility = View.GONE
-            binding.buttonOptimize.isEnabled = true
-        }
     }
 }
