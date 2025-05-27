@@ -22,7 +22,7 @@ class HomeFragment : Fragment() {
     private val binding get() = _binding!!
 
     private lateinit var recentHistoryAdapter: RecentHistoryAdapter
-    private val tripHistoryList = mutableListOf<TripHistory>()
+    private var allRecentHistory = listOf<TripHistory>()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -35,7 +35,7 @@ class HomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        recentHistoryAdapter = RecentHistoryAdapter(tripHistoryList)
+        recentHistoryAdapter = RecentHistoryAdapter(allRecentHistory.toMutableList())
 
         binding.rvRecentHistory.layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
         binding.rvRecentHistory.adapter = recentHistoryAdapter
@@ -54,26 +54,42 @@ class HomeFragment : Fragment() {
     private fun loadRecentHistory() {
         val sharedPref = requireContext().getSharedPreferences("userPrefs", android.content.Context.MODE_PRIVATE)
         val token = sharedPref.getString("access_token", null)
+        val userId = sharedPref.getInt("user_id", -1)
 
         if (token.isNullOrEmpty()) {
             Toast.makeText(requireContext(), "Token tidak ditemukan, silakan login ulang", Toast.LENGTH_SHORT).show()
             return
         }
 
+        if (userId == -1) {
+            Toast.makeText(requireContext(), "User ID tidak ditemukan", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         ApiConfig.getApiService(requireContext()).getTripHistory().enqueue(object : Callback<List<TripHistory>> {
             override fun onResponse(call: Call<List<TripHistory>>, response: Response<List<TripHistory>>) {
                 if (response.isSuccessful) {
-                    val recentHistory = response.body()?.take(1) ?: emptyList()
-                    tripHistoryList.clear()
-                    tripHistoryList.addAll(recentHistory)
-                    recentHistoryAdapter.notifyDataSetChanged()
+                    val data = response.body() ?: emptyList()
+                    allRecentHistory = data.sortedByDescending { it.id }
+                    recentHistoryAdapter = RecentHistoryAdapter(allRecentHistory.toMutableList())
+                    binding.rvRecentHistory.adapter = recentHistoryAdapter
+
+                    recentHistoryAdapter.filterByDriverId(userId)
+
+                    if (recentHistoryAdapter.itemCount == 0) {
+                        binding.rvRecentHistory.visibility = View.GONE
+                    } else {
+                        binding.rvRecentHistory.visibility = View.VISIBLE
+                    }
                 } else {
                     Toast.makeText(requireContext(), "Gagal memuat riwayat", Toast.LENGTH_SHORT).show()
+                    binding.rvRecentHistory.visibility = View.GONE
                 }
             }
 
             override fun onFailure(call: Call<List<TripHistory>>, t: Throwable) {
                 Toast.makeText(requireContext(), "Error: ${t.message}", Toast.LENGTH_SHORT).show()
+                binding.rvRecentHistory.visibility = View.GONE
             }
         })
     }

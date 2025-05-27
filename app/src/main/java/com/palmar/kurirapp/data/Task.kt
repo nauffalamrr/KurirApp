@@ -13,6 +13,15 @@ data class Destination(
 ) : Parcelable
 
 @Parcelize
+data class DestinationResponse(
+    val id: Int,
+    val destination_name: String,
+    val sequence_order: Int,
+    val latitude: Double?,
+    val longitude: Double?
+) : Parcelable
+
+@Parcelize
 data class Task(
     val id: Int,
     var status: String,

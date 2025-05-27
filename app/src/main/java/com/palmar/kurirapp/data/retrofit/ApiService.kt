@@ -6,6 +6,7 @@ import com.palmar.kurirapp.data.MessageResponse
 import com.palmar.kurirapp.data.OptimizeRouteRequest
 import com.palmar.kurirapp.data.OptimizeRouteResponse
 import com.palmar.kurirapp.data.Task
+import com.palmar.kurirapp.data.TaskResponse
 import com.palmar.kurirapp.data.TripHistory
 import retrofit2.Call
 import retrofit2.http.Body
@@ -24,7 +25,7 @@ interface ApiService {
     fun getAllTasks(): Call<List<Task>>
 
     @GET("/api/task/{id}")
-    fun getTaskDetail(@Path("id") taskId: Int): Call<Task>
+    fun getTaskDetail(@Path("id") taskId: Int): Call<TaskResponse>
 
     @POST("/api/task/{id}/accept")
     fun acceptTask(@Path("id") taskId: Int): Call<MessageResponse>

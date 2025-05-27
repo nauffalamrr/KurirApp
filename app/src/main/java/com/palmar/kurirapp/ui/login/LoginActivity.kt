@@ -45,6 +45,7 @@ class LoginActivity : AppCompatActivity() {
                             val editor = sharedPreferences.edit()
                             editor.putString("username", loginResponse.user.name)
                             editor.putString("access_token", loginResponse.access_token)
+                            editor.putInt("user_id", loginResponse.user.id)
                             editor.apply()
 
                             Toast.makeText(this@LoginActivity, "Login berhasil", Toast.LENGTH_SHORT).show()

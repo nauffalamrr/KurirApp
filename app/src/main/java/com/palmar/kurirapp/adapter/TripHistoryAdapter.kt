@@ -1,15 +1,18 @@
 package com.palmar.kurirapp.adapter
 
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.palmar.kurirapp.R
 import com.palmar.kurirapp.data.TripHistory
 import com.palmar.kurirapp.databinding.ItemHistoryTripBinding
+import com.palmar.kurirapp.helper.DateHelper
 
 class TripHistoryAdapter(
-    private val tripHistoryList: MutableList<TripHistory>,
-    private val onDeleteConfirm: (TripHistory) -> Unit
+    private val tripHistoryList: MutableList<TripHistory>
 ) : RecyclerView.Adapter<TripHistoryAdapter.HistoryViewHolder>() {
 
     inner class HistoryViewHolder(private val binding: ItemHistoryTripBinding) :
@@ -17,34 +20,34 @@ class TripHistoryAdapter(
 
         fun bind(history: TripHistory) {
             with(binding) {
-                tvHistoryDate.text = history.date
+                tvHistoryDate.text = DateHelper.formatDate(history.created_at)
                 tvHistoryStatus.text = history.status
-                tvHistoryFrom.text = history.from
-                tvHistoryDestination1.text = history.destination1
 
-                if (history.destination2.isEmpty()) {
-                    layoutDestination2.visibility = View.GONE
-                } else {
-                    layoutDestination2.visibility = View.VISIBLE
-                    tvHistoryDestination2.text = history.destination2
-                }
+                layoutDestinationsContainer.removeAllViews()
 
-                if (history.destination3.isEmpty()) {
-                    layoutDestination3.visibility = View.GONE
-                } else {
-                    layoutDestination3.visibility = View.VISIBLE
-                    tvHistoryDestination3.text = history.destination3
-                }
+                history.destinations.forEachIndexed { index, destination ->
+                    val container = LinearLayout(binding.root.context).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        val paddingPx = (8 * binding.root.resources.displayMetrics.density).toInt()
+                        setPadding(0, paddingPx, 0, paddingPx)
+                    }
 
-                val vehicleIconRes = when (history.vehicle.lowercase()) {
-                    "motorcycle" -> com.palmar.kurirapp.R.drawable.ic_motor
-                    "car" -> com.palmar.kurirapp.R.drawable.ic_car
-                    else -> com.palmar.kurirapp.R.drawable.ic_motor
-                }
-                ivVehicle.setImageResource(vehicleIconRes)
+                    val icon = ImageView(binding.root.context).apply {
+                        setImageResource(R.drawable.ic_destination)
+                        val sizePx = (16 * binding.root.resources.displayMetrics.density).toInt()
+                        layoutParams = LinearLayout.LayoutParams(sizePx, sizePx).apply {
+                            marginEnd = (8 * binding.root.resources.displayMetrics.density).toInt()
+                        }
+                    }
 
-                ivDelete.setOnClickListener {
-                    onDeleteConfirm(history)
+                    val tv = TextView(binding.root.context).apply {
+                        text = "${destination.destination_name}"
+                        textSize = 12f
+                    }
+
+                    container.addView(icon)
+                    container.addView(tv)
+                    layoutDestinationsContainer.addView(container)
                 }
             }
         }

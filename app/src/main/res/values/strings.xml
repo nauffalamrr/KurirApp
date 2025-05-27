@@ -48,6 +48,7 @@
     //History Page
     <string name="title_history">History</string>
     <string name="title_page_history">Trip History</string>
+    <string name="empty_history">No Trip History</string>
 
     //Profile Page
     <string name="title_profile">Profile</string>

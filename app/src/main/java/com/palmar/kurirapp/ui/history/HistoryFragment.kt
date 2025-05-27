@@ -31,11 +31,7 @@ class HistoryFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        adapter = TripHistoryAdapter(tripHistoryList) { trip ->
-            Toast.makeText(requireContext(), "Hapus trip: ${trip.date}", Toast.LENGTH_SHORT).show()
-            tripHistoryList.remove(trip)
-            adapter.notifyDataSetChanged()
-        }
+        adapter = TripHistoryAdapter(tripHistoryList)
 
         binding.rvTripHistory.layoutManager = LinearLayoutManager(requireContext())
         binding.rvTripHistory.adapter = adapter
@@ -46,9 +42,15 @@ class HistoryFragment : Fragment() {
     private fun loadHistory() {
         val sharedPref = requireContext().getSharedPreferences("userPrefs", android.content.Context.MODE_PRIVATE)
         val token = sharedPref.getString("access_token", null)
+        val userId = sharedPref.getInt("user_id", -1)
 
         if (token.isNullOrEmpty()) {
             Toast.makeText(requireContext(), "Token tidak ditemukan, silakan login ulang", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (userId == -1) {
+            Toast.makeText(requireContext(), "User ID tidak ditemukan", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -56,18 +58,38 @@ class HistoryFragment : Fragment() {
             override fun onResponse(call: Call<List<TripHistory>>, response: Response<List<TripHistory>>) {
                 if (response.isSuccessful) {
                     val data = response.body() ?: emptyList()
+                    val filtered = data
+                        .filter { it.driver_id == userId }
+                        .sortedByDescending { it.id }
                     tripHistoryList.clear()
-                    tripHistoryList.addAll(data)
+                    tripHistoryList.addAll(filtered)
                     adapter.notifyDataSetChanged()
+                    checkIfEmpty()
                 } else {
                     Toast.makeText(requireContext(), "Gagal memuat riwayat", Toast.LENGTH_SHORT).show()
+                    showEmptyView()
                 }
             }
 
             override fun onFailure(call: Call<List<TripHistory>>, t: Throwable) {
                 Toast.makeText(requireContext(), "Error: ${t.message}", Toast.LENGTH_SHORT).show()
+                showEmptyView()
             }
         })
+    }
+
+    private fun checkIfEmpty() {
+        if (tripHistoryList.isEmpty()) {
+            showEmptyView()
+        } else {
+            binding.rvTripHistory.visibility = View.VISIBLE
+            binding.emptyHistoryText.visibility = View.GONE
+        }
+    }
+
+    private fun showEmptyView() {
+        binding.rvTripHistory.visibility = View.GONE
+        binding.emptyHistoryText.visibility = View.VISIBLE
     }
 
     override fun onDestroyView() {

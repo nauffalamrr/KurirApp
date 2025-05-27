@@ -61,7 +61,10 @@ class TaskFragment : Fragment() {
             override fun onResponse(call: Call<List<Task>>, response: Response<List<Task>>) {
                 if (response.isSuccessful) {
                     tasks.clear()
-                    response.body()?.let { tasks.addAll(it) }
+                    response.body()?.let {
+                        val sortedTasks = it.sortedByDescending { task -> task.id }
+                        tasks.addAll(sortedTasks)
+                    }
                     adapter.notifyDataSetChanged()
                 } else {
                     Toast.makeText(requireContext(), "Gagal memuat task", Toast.LENGTH_SHORT).show()

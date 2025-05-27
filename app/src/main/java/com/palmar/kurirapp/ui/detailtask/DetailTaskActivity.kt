@@ -5,10 +5,9 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.palmar.kurirapp.data.MessageResponse
-import com.palmar.kurirapp.data.Task
-import com.palmar.kurirapp.data.retrofit.ApiConfig
 import com.palmar.kurirapp.adapter.DetailTaskAdapter
+import com.palmar.kurirapp.data.*
+import com.palmar.kurirapp.data.retrofit.ApiConfig
 import com.palmar.kurirapp.databinding.ActivityDetailTaskBinding
 import retrofit2.Call
 import retrofit2.Callback
@@ -60,6 +59,21 @@ class DetailTaskActivity : AppCompatActivity() {
         }
     }
 
+    private fun mapDestinationResponseToDestination(destResp: DestinationResponse): Destination {
+        val location = Location(
+            latitude = destResp.latitude ?: 0.0,
+            longitude = destResp.longitude ?: 0.0,
+            name = destResp.destination_name
+        )
+        return Destination(
+            id = destResp.id,
+            location = location,
+            sequence_order = destResp.sequence_order,
+            latitude = destResp.latitude ?: 0.0,
+            longitude = destResp.longitude ?: 0.0
+        )
+    }
+
     private fun fetchTaskDetail(taskId: Int) {
         if (accessToken.isBlank()) {
             Toast.makeText(this, "Token tidak ditemukan, silakan login ulang", Toast.LENGTH_SHORT).show()
@@ -68,13 +82,21 @@ class DetailTaskActivity : AppCompatActivity() {
         }
 
         ApiConfig.getApiService(this).getTaskDetail(taskId)
-            .enqueue(object : Callback<Task> {
-                override fun onResponse(call: Call<Task>, response: Response<Task>) {
+            .enqueue(object : Callback<TaskResponse> {
+                override fun onResponse(call: Call<TaskResponse>, response: Response<TaskResponse>) {
                     if (response.isSuccessful) {
-                        val fetchedTask = response.body()
-                        if (fetchedTask != null) {
-                            task = fetchedTask
-                            updateUI()
+                        val taskResp = response.body()
+                        if (taskResp != null) {
+                            val destinationsMapped = taskResp.destinations.map { mapDestinationResponseToDestination(it) }
+                            task = Task(
+                                id = taskResp.id,
+                                status = taskResp.status,
+                                driver_id = taskResp.driver_id,
+                                destinations = destinationsMapped
+                            )
+                            destinationListAdapter.updateData(task.destinations)
+                            isTaskStarted = task.status != "waiting"
+                            updateButtonUI()
                         } else {
                             Toast.makeText(this@DetailTaskActivity, "Task tidak ditemukan", Toast.LENGTH_SHORT).show()
                             finish()
@@ -85,18 +107,14 @@ class DetailTaskActivity : AppCompatActivity() {
                     }
                 }
 
-                override fun onFailure(call: Call<Task>, t: Throwable) {
+                override fun onFailure(call: Call<TaskResponse>, t: Throwable) {
                     Toast.makeText(this@DetailTaskActivity, "Error: ${t.message}", Toast.LENGTH_SHORT).show()
                     finish()
                 }
             })
     }
 
-    private fun updateUI() {
-        binding.titleDetailTask.text = "Task #${task.id}"
-        destinationListAdapter.updateData(task.destinations)
-        isTaskStarted = task.status != "waiting"
-
+    private fun updateButtonUI() {
         if (task.status == "waiting") {
             binding.doTaskButton.text = getString(com.palmar.kurirapp.R.string.do_task)
             binding.endTaskButton.visibility = View.GONE
@@ -116,14 +134,14 @@ class DetailTaskActivity : AppCompatActivity() {
 
         binding.doTaskButton.isEnabled = false
 
-        ApiConfig.getApiService(this).acceptTask( task.id)
+        ApiConfig.getApiService(this).acceptTask(task.id)
             .enqueue(object : Callback<MessageResponse> {
                 override fun onResponse(call: Call<MessageResponse>, response: Response<MessageResponse>) {
                     binding.doTaskButton.isEnabled = true
                     if (response.isSuccessful) {
                         Toast.makeText(this@DetailTaskActivity, response.body()?.message ?: "Task accepted", Toast.LENGTH_SHORT).show()
                         task.status = "delivery"
-                        updateUI()
+                        updateButtonUI()
                     } else {
                         Toast.makeText(this@DetailTaskActivity, "Gagal menerima task", Toast.LENGTH_SHORT).show()
                     }
@@ -145,7 +163,7 @@ class DetailTaskActivity : AppCompatActivity() {
         binding.doTaskButton.isEnabled = false
         binding.endTaskButton.isEnabled = false
 
-        ApiConfig.getApiService(this).completeTask( task.id)
+        ApiConfig.getApiService(this).completeTask(task.id)
             .enqueue(object : Callback<MessageResponse> {
                 override fun onResponse(call: Call<MessageResponse>, response: Response<MessageResponse>) {
                     binding.doTaskButton.isEnabled = true
@@ -153,7 +171,7 @@ class DetailTaskActivity : AppCompatActivity() {
                     if (response.isSuccessful) {
                         Toast.makeText(this@DetailTaskActivity, response.body()?.message ?: "Task completed", Toast.LENGTH_SHORT).show()
                         task.status = "completed"
-                        updateUI()
+                        updateButtonUI()
                     } else {
                         Toast.makeText(this@DetailTaskActivity, "Gagal menyelesaikan task", Toast.LENGTH_SHORT).show()
                     }
